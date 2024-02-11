@@ -1,5 +1,3 @@
-# FROM: https://www.r-exercises.com/2019/08/12/vectors-and-functions/
-
 # Did you know R has actually lots of built-in datasets that we can use to practise? 
 # For example, the rivers data “gives the lengths (in miles) of 141 “major” rivers in 
 #       North America, as compiled by the US Geological Survey” (you can find this 
