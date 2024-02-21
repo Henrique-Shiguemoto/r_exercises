@@ -1,0 +1,298 @@
+---
+title: "The Office Analysis"
+author: "Henrique Shiguemoto Felizardo"
+date: "2024-02-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+library(tidyverse)
+library(forcats)
+library(DT)
+library(gridExtra)
+library(stats)
+```
+
+## Description
+
+This is an analysis project from the *"Data Analysis with R"* website by Joseph Fox. The objective is to analyse data from The Office episode/season ratings and come up with some visualizations from which we can draw conclusions about the show.
+
+According to Joseph Fox, is the best show of all time, which isn't true I'm afraid, South Park is way better, but whatevs.
+
+## Impoting the data
+
+```{r import}
+office_ratings <- readr::read_csv('https://raw.githubusercontent.com/jafox11/MS282/main/office_ratings.csv')
+office_ratings$season <- as.character(office_ratings$season)
+office_ratings$air_date <- as.Date(office_ratings$air_date, "%m/%d/%Y")
+datatable(office_ratings, options = list(scrollX = TRUE))
+```
+
+It's a table with 186 rows and 7 columns. Where the columns, respectively, represent: 
+
+- season (Categorical): season during which the episode aired
+- episode (Categorical): episode number within the season
+- title (Categorical): title of episode
+- viewers (Continuous): number of viewers on original air date (In Millions)
+- imdb_rating (Continuous): average fan rating on IMDb.com from 1 to 10
+- total_votes (Continuous): number of ratings on IMDb.com
+- air_date (Date): date episode originally aired
+
+Now that all the data is understood and imported, we're ready to start analysing it.
+
+## How are Viewer Count, IMdb Ratings and the number of ratings on IMdb.com distributed?
+
+```{r viewer_count_distribution}
+ggplot(data = office_ratings, aes(x = viewers)) +
+    labs(title = "Viewer Count Distribution",
+         x = "Viewer Count",
+         y = "Frequency",
+         caption = "Source: raw.githubusercontent.com/jafox11/MS282/main/office_ratings.csv") + 
+    scale_x_continuous(breaks = seq(from = 0, to = 24, by = 1)) + 
+    geom_freqpoly(bins = 100) + 
+    theme_minimal()
+```
+
+It's possible to see that viewer count has a mode of a little bit less than 7.5, which means that most episodes of the show had about 7.5 million people watching when the episode aired. There's an extreme value of around 23 million people with a very low frequency. I wonder which episode it is...
+
+```{r which_episode_had_the_most_viewers}
+
+office_ratings[office_ratings$viewers == max(office_ratings$viewers), ]
+
+```
+
+Stress Relief was a huge banger!
+
+<br>
+
+```{r imdb_ratings_distribution}
+ggplot(data = office_ratings, aes(x = imdb_rating)) + 
+    labs(title = "IMdb Ratings Distribution",
+         x = "IMdb Ratings",
+         y = "Frequency",
+         caption = "Source: raw.githubusercontent.com/jafox11/MS282/main/office_ratings.csv") + 
+    scale_x_continuous(breaks = seq(from = 6, to = 10, by = 0.5)) + 
+    geom_freqpoly(bins = 30) + 
+    theme_minimal()
+```
+
+The most common IMdb ratings for The Office episodes is about 8.3 ~ 8.4. There are values close to ratings such as 9.4, but also such as 6.7. The distribution seems to follow a normal distribution pretty well, this means that the variability of ratings is normal. In other words, most episodes are pretty close to the mean, with very few outliers.
+
+<br>
+
+```{r total_imdb_votes_distribution}
+
+ggplot(data = office_ratings, aes(x = total_votes)) + 
+    labs(title = "Total IMdb Votes Distribution",
+         x = "Total IMdb Votes",
+         y = "Frequency",
+         caption = "Source: raw.githubusercontent.com/jafox11/MS282/main/office_ratings.csv") + 
+    scale_x_continuous(breaks = seq(from = 1000, to = 8000, by = 500)) + 
+    geom_freqpoly(bins = 100) + 
+    theme_minimal()
+```
+
+The number of votes is skewed positively, which means that bigger frequencies are found in smaller values. Most episodes had about 1400 to 1700 votes on IMdb.com. There are some extreme values around 5500 and 6000, but also a very extreme value a little less than 8000. The last on mentioned turns out to be the finale episode, which makes sense.
+
+```{r which_episode_has_the_most_imdb_total_votes}
+office_ratings[office_ratings$total_votes == max(office_ratings$total_votes), ]
+```
+
+## Is it the case that the more people watch an episode, the better it’s liked?
+
+To answer this question, we'll have to visualize the data from the viewer column and the IMdb ratings column. Since both are continuous variables, let's use a scatterplot to visualize the relationship between these two variables.
+
+```{r viewer_count_vs_imdb_ratings}
+ggplot(data = office_ratings, aes(x = viewers, y = imdb_rating)) + 
+    labs(title = "Relationship between Viewer Count and IMdb Ratings",
+         subtitle = "Not a very strong relationship, but there's one none the less",
+         x = "Viewer Count",
+         y = "Ratings",
+         caption = "Source: raw.githubusercontent.com/jafox11/MS282/main/office_ratings.csv") +
+    scale_x_continuous(breaks = seq(from = 0, to = 24, by = 1)) + 
+    geom_point() + 
+    theme_minimal() + 
+    stat_smooth(method = "lm", se = FALSE, color = "lightblue")
+```
+
+There seems to be a trend as shown by the lightblue line from the previous plot. Although it isn't a very strong correlation, the correlation existis.
+
+```{r viewer_count_and_imdb_ratings_correlation}
+cor(office_ratings$viewers, office_ratings$imdb_rating) # from the stats package
+```
+
+## Are there any exceptions to the trend in the previous problem?
+
+There are many values which are far away from the line drawn by the linear model in the previous plot. This means it's not possible to say that they follow the trend.
+
+```{r exceptions_from_viewer_count_vs_imdb_ratings}
+
+model <- lm(imdb_rating~viewers, data=office_ratings)
+
+ggplot(data = office_ratings, aes(x = viewers, y = imdb_rating, color = abs(resid(model)) > 1.1)) + 
+    labs(title = "Relationship between Viewer Count and IMdb Ratings",
+         subtitle = "There's a trend, but there are some exceptions",
+         x = "Viewer Count",
+         y = "Ratings",
+         caption = "Source: raw.githubusercontent.com/jafox11/MS282/main/office_ratings.csv",
+         color = "Is it an Exception?") +
+    scale_x_continuous(breaks = seq(from = 0, to = 24, by = 1)) + 
+    geom_point() +
+    theme_minimal() + 
+    stat_smooth(method = "lm", se = FALSE, color = "lightblue")
+```
+
+
+## Is it the case that the more people watch an episode, the more people leave an IMDb rating? Are there exceptions?
+
+Now instead of checking viewer count against IMdb ratings, we'll be checking viewer count against total IMdb votes. Let's use a scatterplot again since both are still continuous variables.
+
+```{r viewer_count_vs_total_imdb_votes}
+ggplot(data = office_ratings, aes(x = viewers, y = total_votes)) + 
+    labs(title = "Viewer Count vs. Total IMdb Votes",
+         x = "Viewer Count",
+         y = "Total Votes",
+         caption = "Source: raw.githubusercontent.com/jafox11/MS282/main/office_ratings.csv") + 
+    scale_x_continuous(breaks = seq(from = 0, to = 24, by = 1)) + 
+    scale_y_continuous(breaks = seq(from = 0, to = 8000, by = 1000)) + 
+    geom_point() + 
+    theme_minimal()
+```
+
+There seems to be a trend around the [3, 12] interval on the X-axis, and around the [1000, 4500] interval on the Y-axis. But outside of those intervals we have some exceptions. For example, there's an episode in which the total votes was close to 8000, but the viewer count (around 5.6) was less than the average for the whole show (7.245).
+
+```{r viewer_count_and_total_imdb_votes_correlation}
+cor(office_ratings$viewers, office_ratings$total_votes)
+```
+
+The correlation value suggests that there was in fact a trend going on.
+
+```{r exceptions_from_viewer_count_vs_total_imdb_votes}
+
+model <- lm(total_votes~viewers, data=office_ratings)
+
+ggplot(data = office_ratings, aes(x = viewers, y = total_votes, color = resid(model), size = resid(model))) + 
+    labs(title = "Relationship between Viewer Count and Total IMdb Votes",
+         subtitle = "There's a trend, but there are some exceptions",
+         x = "Viewer Count",
+         y = "Total IMdb Votes",
+         caption = "Source: raw.githubusercontent.com/jafox11/MS282/main/office_ratings.csv",
+         color = "How much of an Exception?",
+         size = "How much of an Exception?") +
+    scale_x_continuous(breaks = seq(from = 0, to = 24, by = 1)) + 
+    geom_point() +
+    theme_minimal() + 
+    stat_smooth(method = "lm", se = FALSE, color = "lightblue")
+```
+
+Now it's possible to see that the lighter the blue color is for the point in the scatterplot, the more of an exception it is. The same thing can be said for the size of the point.
+
+## How did the show’s popularity change over time?
+
+We'll have to analyse the way the variable viewers changed over time using the air_date variable as the time variable. For that, let's use a normal line graph.
+
+```{r popularity_over_time}
+ggplot(data = office_ratings, aes(x = air_date, y = viewers)) + 
+    labs(title = "How did The Office's popularity change over time?",
+         subtitle = "It had a consistent popularity, but declined slowly. Stress Relief is the outlier in the middle",
+         x = "Air Date",
+         y = "Viewer Count",
+         caption = "Source: raw.githubusercontent.com/jafox11/MS282/main/office_ratings.csv") + 
+    scale_x_date(date_labels = "%m-%y", date_breaks = '10 month') + 
+    geom_point(alpha = 0.6) + 
+    geom_smooth() + 
+    theme_minimal()
+```
+
+## How did the show’s appeal change over time?
+
+```{r appeal_over_time}
+ggplot(data = office_ratings, aes(x = air_date, y = imdb_rating)) + 
+    labs(title = "How did The Office's appeal change over time?",
+         subtitle = "It had a rise in the beginning, but it declined with a slight rise at the end.",
+         x = "Air Date",
+         y = "IMdb Rating",
+         caption = "Source: raw.githubusercontent.com/jafox11/MS282/main/office_ratings.csv") + 
+    scale_x_date(date_labels = "%m-%y", date_breaks = '10 month') + 
+    geom_smooth() + 
+    geom_point() + 
+    theme_minimal()
+```
+
+## The trends in the previous two problems are different, explain why this might be?
+
+One possible explanation could be that the show introduced characters after the third season which weren't as charismatic as the ones introduced in the first two seasons. 
+
+## Is there a trend in total viewership within the individual seasons? Are there any notable changes in viewership within any season?
+
+```{r trends_in_viewership_per_season, echo=FALSE}
+p1 <- ggplot(office_ratings[office_ratings$season == 1, ], aes(x = episode, y = viewers)) + 
+    geom_smooth(se = FALSE) +
+    labs(subtitle = "Season 1") +
+    theme_minimal()
+
+p2 <- ggplot(office_ratings[office_ratings$season == 2, ], aes(x = episode, y = viewers)) + 
+    geom_smooth(se = FALSE) +
+    labs(subtitle = "Season 2") +
+    theme_minimal()
+
+p3 <- ggplot(office_ratings[office_ratings$season == 3, ], aes(x = episode, y = viewers)) + 
+    geom_smooth(se = FALSE) +
+    labs(subtitle = "Season 3") +
+    theme_minimal()
+
+p4 <- ggplot(office_ratings[office_ratings$season == 4, ], aes(x = episode, y = viewers)) + 
+    geom_smooth(se = FALSE) +
+    labs(subtitle = "Season 4") +
+    theme_minimal()
+
+p5 <- ggplot(office_ratings[office_ratings$season == 5, ], aes(x = episode, y = viewers)) + 
+    geom_smooth(se = FALSE) +
+    labs(subtitle = "Season 5") +
+    theme_minimal()
+
+p6 <- ggplot(office_ratings[office_ratings$season == 6, ], aes(x = episode, y = viewers)) + 
+    geom_smooth(se = FALSE) +
+    labs(subtitle = "Season 6") +
+    theme_minimal()
+
+p7 <- ggplot(office_ratings[office_ratings$season == 7, ], aes(x = episode, y = viewers)) + 
+    geom_smooth(se = FALSE) +
+    labs(subtitle = "Season 7") +
+    theme_minimal()
+
+p8 <- ggplot(office_ratings[office_ratings$season == 8, ], aes(x = episode, y = viewers)) + 
+    geom_smooth(se = FALSE) +
+    labs(subtitle = "Season 8") +
+    theme_minimal()
+
+p9 <- ggplot(office_ratings[office_ratings$season == 9, ], aes(x = episode, y = viewers)) + 
+    geom_smooth(se = FALSE) +
+    labs(subtitle = "Season 9") +
+    theme_minimal()
+
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, ncol = 3)
+```
+
+It seems that every season starts off strong and then viewership gradually declines, this is the behavior for most seasons. In season 5 this doesn't happen because of the Stress Relief episode, which was so popular that the shape of the line is completely different from the others. However, if the episode was just like the average, the trend line in Season 5 would be much more like the others.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
